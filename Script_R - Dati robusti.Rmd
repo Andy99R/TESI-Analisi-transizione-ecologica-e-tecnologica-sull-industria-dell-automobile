@@ -1,0 +1,274 @@
+---
+title: "Script R - Tesi RUSU - CLEST 2"
+output:
+  html_document:
+    df_print: paged
+  html_notebook: default
+  pdf_document: default
+---
+### Pacchetti utilizzati 
+```{r Import librerie, message=FALSE, warning=FALSE}
+library(readxl)
+library(plm)
+library(ggplot2)
+library(foreign)
+library(car)
+library(tidyverse)
+library(reshape2)
+library(dplyr)
+library(modelsummary)
+library(sjPlot)
+library(sjmisc)
+library(sjlabelled)
+library(dyn)
+library(lmtest)
+library(sandwich)
+library(psych)
+library(olsrr) #Variable selection library 
+```
+### Creazione del panel data
+```{r Creazione dataset, message=FALSE, warning=FALSE, paged.print=FALSE}
+dataset <- read_excel("Dataset_robusto.xlsx", 
+    col_types = c("text", "numeric", "numeric", 
+        "numeric", "numeric", "numeric", 
+        "numeric", "numeric", "numeric", 
+        "numeric", "numeric","numeric","numeric","numeric","numeric"))
+dataset  <- pdata.frame(dataset, index = c("Paese", "Anno"))
+pdim(dataset)
+
+```
+# ```{r Subset df ITALIA, message=FALSE, warning=FALSE}
+# #Creazione DATAFRAME SOLO ITALIA
+# df_ita <- filter(dataset, Paese == "Italy") %>% na.omit() 
+# df_ita <- as.data.frame(df_ita)
+# 
+# describe.by(dataset)
+# ```
+# 
+# 
+# ### Analisi esplorativa
+# ```{r Trend immatricolazioni, message=FALSE, warning=FALSE}
+# time <- c(1995,2000,2005,2010,2015,2019)
+# ggplot(dataset, aes(x = Anno, y = Registrations, col=Paese, group = Paese)) +
+#   geom_line()  + 
+#     xlab("Anno") +
+#     ylab("Nuove auto registrate per paese (Index 2015=100") + 
+#     scale_x_discrete(breaks = time) +
+#   labs(title = "Andamento immatricolazioni paesi di riferimento")
+# ```
+# ```{r Trend R&D, message=FALSE, warning=FALSE}
+# ggplot(dataset, aes(x = Anno, y = R.D, col = Paese, group = Paese)) +
+#   geom_line() +
+#   xlab("Anno") +
+#   ylab("Spesa in R&D (USD) per paese)") + 
+#   scale_x_discrete(breaks = time) +
+#   labs(title = "Investimenti in Ricerca e Sviluppo all'interno dei paesei di riferimento")
+# ```
+# ```{r Grafico PIL, message=FALSE, warning=FALSE}
+# ggplot(dataset, aes(x = Anno, y = GDP, col = Paese, group = Paese)) +
+#   geom_line() +
+#   xlab("Anno") +
+#   ylab("Tasso PIL annuale per paese") + 
+#   scale_x_discrete(breaks = time) +
+#   labs(title = "Prodotto Interno Lordo paesi di riferimento")
+# ```
+# 
+# ```{r Trend brevetti ICE, message=FALSE, warning=FALSE}
+# ggplot(dataset, aes(x = Anno, y = Patents_B,, col=Paese, group = Paese)) +
+#   geom_line() +
+#   xlab("Anno") +
+#   ylab("Brevetti motore ICE per paese") + 
+#   scale_x_discrete(breaks = time) +
+#   labs(title = "Produzione di brevetti 'Brown'")
+# ```
+# ```{r Trend brevetti Hybrid, message=FALSE, warning=FALSE}
+# ggplot(dataset, aes(x = Anno, y = Patents_H,col=Paese, group=Paese)) +
+#   geom_line()  + 
+#     xlab("Anno") +
+#     ylab("Brevetti tecnologia hybrid per paese") + 
+#     scale_x_discrete(breaks = time) +
+#     labs(title = "Produzione di brevetti 'Hybrid'")
+# ```
+# ```{r Trend brevetti Green, message=FALSE, warning=FALSE}
+# ggplot(data = dataset, aes(x = Anno, y = Patents_G,col=Paese, group = Paese)) +
+#     geom_line() + 
+#     xlab("Anno") +
+#     ylab("Brevetti green registrati per paese") + 
+#     scale_x_discrete(breaks = time) +
+#   labs(title = "Produzione di brevetti 'Green'")
+# ```
+# 
+# 
+# ```{r Trend occupazione, message=FALSE, warning=FALSE}
+# ggplot(dataset, aes(x = Anno, y = Employment, col=Paese, group= Paese)) +
+#   geom_line()+ 
+#     xlab("Anno") +
+#     ylab("Occupati nell'industria dell'automobile per paese (migliaia)") + 
+#     scale_x_discrete(breaks = time) +
+#     labs(title = "Andamento occupazione settore automotive")
+# ```
+# 
+# ```{r Trend occupazione (indotto), message=FALSE, warning=FALSE}
+# 
+# ggplot(dataset, aes(x = Anno, y = Employment_equipment, group = Paese, colour = Paese)) +
+#   geom_line() +
+#   labs(x = "Anno", y = "Occupazione settore fornitori per paese") + 
+#   scale_x_discrete(breaks = time) +
+#   labs(title = "Andamento occupazione settore fornitori")
+# 
+# ```
+# 
+# 
+# ```{r Scatter1, message=FALSE, warning=FALSE}
+# ggplot(df_ita, aes(x = Registrations, y = Employment)) +
+#   geom_point() +
+#   xlab("Immatricolazioni nuove auto Italia") +
+#   ylab("Occupazione settore auto Italia") +
+#   labs(title = "Scatterplot Immatricolazioni-Occupazione") + 
+#   geom_smooth(method=lm, se=FALSE,col="darkorange")
+# ```
+# 
+# ```{r Scatter2, message=FALSE, warning=FALSE}
+# ggplot(df_ita, aes(x = Registrations, y = Patents_G)) +
+#   geom_point() +
+#   xlab("Immatricolazioni nuove auto Italia") +
+#   ylab("Brevetti green registrati in Italia") +
+#   labs(title = "Scatterplot Immatricolazioni - Brevetti Green") +
+#   geom_smooth(method=lm, se=FALSE, col="darkorange")
+# ```
+# 
+# ```{r Scatter3, message=FALSE, warning=FALSE}
+# ggplot(df_ita, aes(x = Patents_G, y = Employment)) +
+#   geom_point(color="red") +
+#   ylab("Occupazione settore auto Italia") +
+#   xlab("Registrazione Brevetti green Italia") +
+#   labs(title = "Scatterplot occupazione - Brevetti green") + 
+#   geom_smooth(method=lm, se=FALSE,col="deepskyblue3")
+# ```
+# ```{r Scatter4, message=FALSE, warning=FALSE}
+# ggplot(df_ita, aes(x = Patents_H, y = Employment)) +
+#   geom_point(color="red") +
+#   ylab("Occupazione settore auto Italia") +
+#   xlab("Registrazione brevetti tecnologia ibrida") +
+#   labs(title = "Scatterplot occupazione - Brevetti hybrid") + 
+#   geom_smooth(method=lm, se=FALSE, col="deepskyblue3")
+# ```
+# 
+# ```{r Scatter5, message=FALSE, warning=FALSE}
+# ggplot(df_ita, aes(x = Patents_B, y = Employment)) +
+#   geom_point(color="red") +
+#   ylab("Occupazione settore auto Italia") +
+#   xlab("Registrazione brevetti motore a combustione interna") +
+#   labs(title = "Scatterplot occupazione - Brevetti brown") +
+#   geom_smooth(method=lm, se=FALSE,col="deepskyblue3")
+# ```
+# 
+# ```{r Scatter6, message=FALSE, warning=FALSE}
+# ggplot(df_ita, aes(x = Patents_G, y = Employment_equipment)) +
+#   geom_point(color="blue") +
+#   ylab("Occupazione settore fornitori Italia") +
+#   xlab("Registrazione brevetti green Italia") +
+#   labs(title = "Scatterplot occupazione fornitori - Brevetti green") + 
+#   geom_smooth(method=lm, se=FALSE, col='Brown1')
+# ```
+# 
+# ```{r Scatter7, message=FALSE, warning=FALSE}
+# ggplot(df_ita, aes(x = Patents_H, y = Employment_equipment)) +
+#   geom_point(color="blue") +
+#   ylab("Occupazione fornitori Italia") +
+#   xlab("Registrazione brevetti tecnologia ibrida") +
+#   labs(title = "Scatterplot occupazione fornitori - Brevetti hybrid") + 
+#   geom_smooth(method=lm, se=FALSE, col='Brown1')
+# ```
+# 
+# ```{r Scatter8, message=FALSE, warning=FALSE}
+# ggplot(df_ita, aes(x = Patents_B, y = Employment_equipment)) +
+#   geom_point(color="blue") +
+#   ylab("Occupazione settore fortnitori Italia") +
+#   xlab("Registrazione brevetti motore a combustione interna") +
+#   labs(title = "Scatterplot occupazione fornitori - Brevetti Brown") + 
+#   geom_smooth(method=lm, se=FALSE, col='Brown1')
+# ```
+
+### Base models
+```{r Modelli FE ed RE, message=FALSE, warning=FALSE}
+#Scalo i dati per risolvere il problema di matrice singolare in R
+dataset$Imports <- dataset$Imports/1000
+dataset$Exports <- dataset$Exports/1000
+dataset$R.D <- dataset$R.D/10000
+dataset$Population <- dataset$Population/10000
+
+#Qui viene creato il modello Fixed Effects
+modello_fe <- plm(Employment ~ Registrations + Patents_G + Patents_H + Patents_B + R.D + Imports + Exports + Wage + GDP + Population, data = dataset, index = c("Paese", "Anno"), model = "within")
+
+#Qui viene creato il modello Random Effects 
+modello_re <- plm(Employment ~ Registrations + Patents_G + Patents_H + Patents_B + R.D + Imports + Exports + Wage + GDP + Population, data = dataset, index = c("Paese", "Anno"), model = "random", random.method = "walhus")
+#Il modello RE non viene eseguito. Apparentemente R aprossima valori molto piccoli a zero rendendo la matrice dei dati computazionalmente singolare se inserisco anche Import ed Export che ho omeesso per ora in attesa di trovare una soluzione. 
+
+tab_model(modello_fe,modello_re, show.aic = T,show.se = T, show.ci = F, dv.labels = c("Modello FE","Modello RE"))
+
+```
+
+### Hausman TEST
+```{r Hausman TEST, message=FALSE, warning=FALSE}
+#Hausman Test for Panel Models
+phtest(modello_fe,modello_re)
+#Questo test assume come ipotesi nulla che che il modello preferito è il random effects contro l'alternativa che il modello preferito sia il fixed effects. Dato il p-value estremamente basso e comunque minore di 0.05 possiamo concludere che il modello migliore è il Fixed Effects. 
+```
+
+### Serial correlation TEST
+```{r Serial Correlation TEST, message=FALSE, warning=FALSE}
+pbgtest(modello_fe)
+
+# La statistica del test per il test di Breusch-Godfrey/Wooldridge segue una distribuzione chi-quadrato con un grado di libertà. In questo caso, la statistica del test è di 51,164 con un valore p di 8.495e-13, il che indica una forte evidenza contro l'ipotesi nulla di assenza di correlazione seriale negli errori idiosincratici. Pertanto, l'ipotesi alternativa della presenza di correlazione seriale negli errori idiosincratici è supportata.
+```
+### Lagging dataset t-1
+```{r Dataset laggato}
+#Questa funzione crea un nuovo dataset con le variabili esplicative laggate t-1
+ lagged_dataset <- dataset %>%
+   group_by(Paese) %>%
+   mutate(Registrations = lag(Registrations), Patents_G = lag(Patents_G),Patents_H = lag(Patents_H),Patents_B = lag(Patents_B),R.D = lag(R.D),Exports = lag(Exports),Imports = lag(Imports),Wage=lag(Wage), GDP=lag(GDP), Population=lag(Population))
+ #lagged_dataset <- na.omit(lagged_dataset)
+ lagged_dataset <- pdata.frame(lagged_dataset, index = c("Paese", "Anno"))
+```
+
+
+### Heteroskedasticity TEST 
+```{r Heteroskedasticity TEST, message=FALSE, warning=FALSE}
+#Breuch-Pagan test per eteroschedasticità
+bptest(Employment ~ Registrations + Patents_G + Patents_H + Patents_B + R.D + Imports + Exports, data = dataset, studentize = F)
+# Nel risultato fornito, il test di Breusch-Pagan ha prodotto un valore di BP = 61.641 con 7 gradi di libertà e un p-value molto basso (7.093e-11), il che suggerisce che ci sia una significativa violazione dell'omoschedasticità nei dati. In altre parole, la varianza degli errori non è costante su tutto il range dei valori delle variabili indipendenti. 
+```
+
+### Model for Employment
+
+```{r Modello FE Employment, message=FALSE, warning=FALSE}
+modello_fe_lagged <- plm(Employment ~ Registrations + Patents_G + Patents_H + Patents_B + R.D + Imports + Exports + Wage + GDP + Population, data = lagged_dataset, index = c("Paese", "Anno"), model = "within")
+
+R_squared <- r.squared(modello_fe_lagged) #Estraggo R^2 dal modello
+
+modello_fe_adjusted <- coeftest(modello_fe_lagged,vcovHC) #Questo è il modello con gli standard errors robusti
+#modello_fe <- coeftest(modello_fe_lagged) #modello con gli standard errors normali
+
+#modello_fe #Per vedere coefficienti senza standard error robusti
+```
+### Model for Employment_equipment
+
+```{r Modello FE Employment fornitori, message=FALSE, warning=FALSE}
+modello_fe_lagged_equipment <- plm(Employment_equipment ~ Registrations + Patents_G + Patents_H + Patents_B + R.D + Imports + Exports + Wage_equip + GDP + Population, data = lagged_dataset, index = c("Paese", "Anno"), model = "within")
+
+R_squared_equipment <- r.squared(modello_fe_lagged_equipment) #Estraggo R^2 modello equipment
+
+modello_fe_adjusted_equipment <- coeftest(modello_fe_lagged_equipment,vcovHC) #Questo è il modello con gli standard errors
+#modello_fe_equipment <- coeftest(modello_fe_lagged_equipment) #modello con gli standard errors normali
+#modello_fe_equipment #Per vedere coefficienti senza standard error robusti
+models <- list("Modello automotive robusto" = modello_fe_adjusted, "Modello fornitori robusto" = modello_fe_adjusted_equipment)
+
+modelsummary(models,stars=T, statistic = "{std.error} ({p.value})" )
+```
+
+
+
+
+
+
